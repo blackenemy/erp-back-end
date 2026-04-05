@@ -36,3 +36,10 @@ pnpm-debug.log*
 
 # storybook
 storybook-static/
+
+# .NET test results
+TestResults/
+
+# NuGet artifacts
+*.nupkg
+*.snupkg

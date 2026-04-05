@@ -1,5 +1,8 @@
 <Solution>
+  <Project Path="PricingService.Tests/PricingService.Tests.csproj" />
   <Project Path="PricingService/PricingService.csproj" />
+  <Project Path="RuleService.Tests/RuleService.Tests.csproj" />
   <Project Path="RuleService/RuleService.csproj" />
+  <Project Path="Shared.Tests/Shared.Tests.csproj" />
   <Project Path="Shared/Shared.csproj" />
 </Solution>

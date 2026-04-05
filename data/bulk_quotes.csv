@@ -1,0 +1,11 @@
+weightKg,originZip,destinationZip,description
+3,10100,10200,Bangkok to Nearby (Normal business hours - may get discount)
+12,10100,95120,Bangkok to Phatthalung (Remote area - will add surcharge)
+8,30000,50000,Korat to Khon Kaen (Medium distance)
+25,10100,96000,Bangkok to Satun (Heavy + Remote area - multiple rules apply)
+5,20000,97500,Phuket to Satun (Remote area surcharge)
+2,10100,10300,Bangkok local (Small package - normal rate)
+50,10100,95000,Bangkok to Nakhon Si Thammarat (Very heavy + Remote - high surcharge)
+15,40000,40100,Chiang Mai local (Medium weight)
+7,10100,10800,Bangkok to Samut Prakan (Light package nearby)
+18,50000,95100,Khon Kaen to Nakhon Si Thammarat (Medium-heavy + Remote)

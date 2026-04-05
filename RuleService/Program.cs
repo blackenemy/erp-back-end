@@ -1,25 +1,63 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 using Scalar.AspNetCore;
 using Shared;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ── Logging Configuration ──
+var logLevel = builder.Configuration["LOG_LEVEL"] ?? "Information";
+if (Enum.TryParse<LogLevel>(logLevel, out var level))
+    builder.Logging.SetMinimumLevel(level);
+
+builder.Logging.AddConsole();
+if (bool.TryParse(builder.Configuration["STRUCTURED_LOGGING"], out var structured) && structured)
+    builder.Logging.AddJsonConsole();
 
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.TypeInfoResolverChain.Add(AppJsonContext.Default));
 
 builder.Services.AddSingleton<RuleStore>();
 
+// ── Rate Limiting (100 concurrent requests) ──
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetConcurrencyLimiter(
+            partitionKey: string.Empty,
+            factory: _ => new ConcurrencyLimiterOptions
+            {
+                PermitLimit = 100,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 50
+            }));
+});
+
 builder.Services.AddOpenApi();
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins("http://localhost:3000")
+              .AllowAnyHeader()
+              .AllowAnyMethod());
+});
 
 var app = builder.Build();
 
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation("RuleService starting... Environment: {Env}", app.Environment.EnvironmentName);
+
+app.UseCors();
+app.UseRateLimiter();
 app.MapOpenApi();
 app.MapScalarApiReference();
 
 // ── Health ──
 app.MapGet("/health", () => new { status = "healthy", service = "RuleService" })
-   .WithName("Health");
+   .WithName("Health")
+   .Produces<object>();
 
 // ── Rules CRUD ──
 app.MapGet("/rules", (RuleStore store) =>
@@ -62,6 +100,9 @@ app.MapDelete("/rules/{id}", (string id, RuleStore store) =>
    .WithName("DeleteRule");
 
 app.Run();
+
+// Required for WebApplicationFactory in integration tests
+public partial class Program { }
 
 // ══════════════════════════════════════════════
 //  RuleStore — ConcurrentDictionary + JSON file
