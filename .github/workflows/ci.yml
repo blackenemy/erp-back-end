@@ -39,6 +39,11 @@ jobs:
           dotnet publish RuleService/RuleService.csproj -c Release -o ./publish/RuleService
           dotnet publish PricingService/PricingService.csproj -c Release -o ./publish/PricingService
 
+          # 1.5 Copy data files ให้ RuleService
+          mkdir -p ./publish/RuleService/data
+          cp data/rules.json ./publish/RuleService/data/
+          cp data/rules.json ./publish/RuleService/seed-rules.json
+
           # 2. ส่งไฟล์ + ecosystem config ไปที่เครื่อง 107 (Backend Node)
           rsync -avz --delete ./publish/ root@10.0.0.8:/var/www/hubs-backend/
           rsync -avz ecosystem.config.js root@10.0.0.8:/var/www/hubs-backend/
