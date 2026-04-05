@@ -62,7 +62,7 @@ builder.Services.AddHostedService<BulkQuoteWorker>();
 builder.Services.AddOpenApi();
 builder.Services.AddCors(options =>
 {
-    var corsOrigins = (builder.Configuration["CORS_ORIGINS"] ?? "http://localhost:3000").Split(",");
+    var corsOrigins = (builder.Configuration["CORS_ORIGINS"] ?? "http://localhost:3000,https://epr-front-end.project-hub.it.com").Split(",");
     options.AddDefaultPolicy(policy =>
         policy.WithOrigins(corsOrigins)
               .AllowAnyHeader()

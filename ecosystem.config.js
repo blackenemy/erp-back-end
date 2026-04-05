@@ -8,7 +8,7 @@ module.exports = {
       env: {
         ASPNETCORE_ENVIRONMENT: "Production",
         ASPNETCORE_URLS: "http://+:5002",
-        CORS_ORIGINS: "http://localhost:3000,https://yourdomain.com",
+        CORS_ORIGINS: "http://localhost:3000,https://epr-front-end.project-hub.it.com",
       },
       instances: 1,
       exec_mode: "fork",
