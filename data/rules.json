@@ -1,0 +1,64 @@
+[
+  {
+    "$type": "WeightTier",
+    "id": "rule-weight-standard",
+    "type": "WeightTier",
+    "name": "Standard Weight Pricing",
+    "enabled": true,
+    "tiers": [
+      {
+        "minKg": 0,
+        "maxKg": 5,
+        "pricePerKg": 20
+      },
+      {
+        "minKg": 5.01,
+        "maxKg": 20,
+        "pricePerKg": 15
+      },
+      {
+        "minKg": 20.01,
+        "maxKg": 100,
+        "pricePerKg": 10
+      }
+    ]
+  },
+  {
+    "$type": "TimeWindowPromotion",
+    "id": "rule-promo-lunch",
+    "type": "TimeWindowPromotion",
+    "name": "Lunch Hour Discount",
+    "enabled": true,
+    "startTime": "11:00",
+    "endTime": "13:00",
+    "discountPercent": 15
+  },
+  {
+    "$type": "TimeWindowPromotion",
+    "id": "rule-promo-morning",
+    "type": "TimeWindowPromotion",
+    "name": "Early Bird Discount",
+    "enabled": true,
+    "startTime": "06:00",
+    "endTime": "09:00",
+    "discountPercent": 10
+  },
+  {
+    "$type": "RemoteAreaSurcharge",
+    "id": "rule-surcharge-south",
+    "type": "RemoteAreaSurcharge",
+    "name": "Southern Remote Zone (Nakhon Si Thammarat, Phatthalung, Satun)",
+    "enabled": true,
+    "remoteZipPrefixes": ["95", "96", "97"],
+    "surchargeFlat": 50
+  },
+  {
+    "$type": "RemoteAreaSurcharge",
+    "id": "rule-surcharge-northeast",
+    "type": "RemoteAreaSurcharge",
+    "name": "Northeast Remote Zone (Nakhon Ratchasima, Chaiyaphum, Yasothon)",
+    "enabled": true,
+    "remoteZipPrefixes": ["30", "36", "35"],
+    "surchargeFlat": 35
+  }
+]

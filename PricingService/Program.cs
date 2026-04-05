@@ -1,28 +1,73 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Threading.Channels;
+using System.Threading.RateLimiting;
 using Scalar.AspNetCore;
 using Shared;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ── Logging Configuration ──
+var logLevel = builder.Configuration["LOG_LEVEL"] ?? "Information";
+if (Enum.TryParse<LogLevel>(logLevel, out var level))
+    builder.Logging.SetMinimumLevel(level);
+
+builder.Logging.AddConsole();
+if (bool.TryParse(builder.Configuration["STRUCTURED_LOGGING"], out var structured) && structured)
+    builder.Logging.AddJsonConsole();
+
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.TypeInfoResolverChain.Add(AppJsonContext.Default));
 
-// Typed HttpClient → RuleService
+// ── Rate Limiting (100 concurrent requests) ──
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetConcurrencyLimiter(
+            partitionKey: string.Empty,
+            factory: _ => new ConcurrencyLimiterOptions
+            {
+                PermitLimit = 100,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 50
+            }));
+});
+
+// ── Typed HttpClient → RuleService with Retry (3 attempts, exponential backoff) ──
 builder.Services.AddHttpClient<RuleServiceClient>(client =>
 {
     var url = builder.Configuration["RuleServiceUrl"] ?? "http://localhost:5002";
     client.BaseAddress = new Uri(url);
+    client.Timeout = TimeSpan.FromSeconds(5);
+})
+.ConfigureAdditionalHttpMessageHandlers((handler, services) =>
+{
+    var loggerFactory = services.GetRequiredService<ILoggerFactory>();
+    var logger = loggerFactory.CreateLogger("RuleServiceClient");
+    handler.Add(new RetryHandler(maxRetries: 3, logger: logger));
 });
 
 builder.Services.AddSingleton<JobStore>();
 builder.Services.AddSingleton(Channel.CreateUnbounded<string>());
 builder.Services.AddHostedService<BulkQuoteWorker>();
 builder.Services.AddOpenApi();
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins("http://localhost:3000")
+              .AllowAnyHeader()
+              .AllowAnyMethod());
+});
 
 var app = builder.Build();
 
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation("PricingService starting... Environment: {Env}", app.Environment.EnvironmentName);
+logger.LogInformation("RuleService URL: {Url}", app.Configuration["RuleServiceUrl"]);
+
+app.UseCors();
+app.UseRateLimiter();
 app.MapOpenApi();
 app.MapScalarApiReference();
 
@@ -63,6 +108,9 @@ app.MapGet("/jobs/{jobId}", (string jobId, JobStore jobs) =>
    .WithTags("Jobs");
 
 app.Run();
+
+// Required for WebApplicationFactory in integration tests
+public partial class Program { }
 
 // ══════════════════════════════════════════════
 //  Typed HTTP client for RuleService
@@ -127,9 +175,9 @@ public static class PricingEngine
 
         return new QuoteResult
         {
-            BasePrice  = basePrice,
-            Discount   = discount,
-            Surcharge  = surcharge,
+            BasePrice = basePrice,
+            Discount = discount,
+            Surcharge = surcharge,
             FinalPrice = basePrice - discount + surcharge,
             AppliedRules = applied
         };
@@ -191,25 +239,25 @@ public sealed class JobStore
         Path.Combine(AppContext.BaseDirectory, "jobs.json");
 
     private readonly ConcurrentDictionary<string, JobRecord> _jobs;
-    private readonly ConcurrentDictionary<string, List<QuoteRequest>> _pending = new();
+    private readonly ConcurrentDictionary<string, Queue<QuoteRequest>> _pending;
     private readonly Lock _fileLock = new();
 
     public JobStore()
     {
+        _pending = new();
+
         if (File.Exists(FilePath))
         {
             var json = File.ReadAllText(FilePath);
-            var list = JsonSerializer.Deserialize(json, AppJsonContext.Default.ListJobRecord) ?? [];
+            var list = JsonSerializer.Deserialize<List<JobRecord>>(json, AppJsonContext.Default.ListJobRecord) ?? [];
             _jobs = new(list.ToDictionary(j => j.JobId));
         }
         else
         {
             _jobs = new();
+            Flush();
         }
     }
-
-    public JobRecord? GetById(string id) =>
-        _jobs.TryGetValue(id, out var job) ? job : null;
 
     public void Add(JobRecord job)
     {
@@ -217,11 +265,26 @@ public sealed class JobStore
         Flush();
     }
 
-    public void SetPending(string jobId, List<QuoteRequest> items) =>
-        _pending[jobId] = items;
+    public JobRecord? GetById(string jobId) =>
+        _jobs.TryGetValue(jobId, out var job) ? job : null;
 
-    public List<QuoteRequest> TakePending(string jobId) =>
-        _pending.TryRemove(jobId, out var items) ? items : [];
+    public void SetPending(string jobId, List<QuoteRequest> items)
+    {
+        var queue = new Queue<QuoteRequest>(items);
+        _pending[jobId] = queue;
+    }
+
+    public List<QuoteRequest> TakePending(string jobId)
+    {
+        var result = new List<QuoteRequest>();
+        if (_pending.TryGetValue(jobId, out var queue))
+        {
+            while (queue.Count > 0)
+                result.Add(queue.Dequeue());
+            _pending.TryRemove(jobId, out _);
+        }
+        return result;
+    }
 
     public void Flush()
     {
@@ -231,5 +294,42 @@ public sealed class JobStore
                 [.. _jobs.Values], AppJsonContext.Default.ListJobRecord);
             File.WriteAllText(FilePath, json);
         }
+    }
+}
+
+// ══════════════════════════════════════════════
+//  Retry Handler — HTTP client retry with exponential backoff
+// ══════════════════════════════════════════════
+public sealed class RetryHandler : DelegatingHandler
+{
+    private readonly int _maxRetries;
+    private readonly ILogger _logger;
+
+    public RetryHandler(int maxRetries, ILogger logger)
+    {
+        _maxRetries = maxRetries;
+        _logger = logger;
+    }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        for (int attempt = 0; attempt <= _maxRetries; attempt++)
+        {
+            try
+            {
+                return await base.SendAsync(request, cancellationToken);
+            }
+            catch (HttpRequestException ex) when (attempt < _maxRetries)
+            {
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+                _logger.LogWarning(
+                    "RuleService request failed (attempt {Attempt}/{Max}). Retrying after {Delay}ms",
+                    attempt + 1, _maxRetries + 1, delay.TotalMilliseconds);
+                await Task.Delay(delay, cancellationToken);
+            }
+        }
+        // If we reach here, all retries failed
+        throw new HttpRequestException("RuleService unavailable after all retry attempts");
     }
 }
