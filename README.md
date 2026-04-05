@@ -504,8 +504,7 @@ curl -X POST http://localhost:5001/quotes/price \
 GitHub Actions รันอัตโนมัติเมื่อ push ไปยัง `main`/`dev` หรือ pull request:
 
 ```yaml
-Pipeline Steps:
-  1️⃣ Restore dependencies (พร้อม NuGet caching)
+Pipeline Steps: 1️⃣ Restore dependencies (พร้อม NuGet caching)
   2️⃣ Check formatting (dotnet format --verify-no-changes)
   3️⃣ Run tests (all 53 tests in Release mode)
 ```
@@ -681,13 +680,16 @@ docker compose ps  # ตรวจสอบ container status
 ### Docker Compose ล้มเหลว
 
 ```bash
+# run background
+docker compose up -d
+
 # ล้างสถานะเก่า
 docker compose down -v
 
 # Build ใหม่ (skip cache)
-docker compose up --build --no-cache
+docker compose build --no-cache && docker compose up
 
-# ดูเอา logs
+# ดู logs
 docker compose logs ruleservice
 docker compose logs pricingservice
 ```
