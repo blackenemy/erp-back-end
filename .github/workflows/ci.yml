@@ -36,14 +36,15 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           # 1. สร้างไฟล์สำหรับรันจริง (Publish) ออกมาที่โฟลเดอร์ ./publish
-          dotnet publish MiniPricingPlatform.slnx -c Release -o ./publish
+          dotnet publish RuleService/RuleService.csproj -c Release -o ./publish/RuleService
+          dotnet publish PricingService/PricingService.csproj -c Release -o ./publish/PricingService
 
-          # 2. ส่งไฟล์ไปที่เครื่อง 107 (Backend Node)
+          # 2. ส่งไฟล์ + ecosystem config ไปที่เครื่อง 107 (Backend Node)
           rsync -avz --delete ./publish/ root@10.0.0.8:/var/www/hubs-backend/
+          rsync -avz ecosystem.config.js root@10.0.0.8:/var/www/hubs-backend/
 
-          # 3. สั่ง PM2 รีโหลดแอป (ตรวจสอบชื่อไฟล์ .dll ของโปรเจกต์หลักคุณด้วย)
-          # แก้ไข 'MiniPricingPlatform.Api.dll' ให้ตรงกับชื่อไฟล์จริงของคุณ
-          ssh root@10.0.0.8 "cd /var/www/hubs-backend && (pm2 reload hubs-backend || pm2 start dotnet --name hubs-backend -- MiniPricingPlatform.Api.dll)"
+          # 3. สั่ง PM2 รีโหลดแอป
+          ssh root@10.0.0.8 "cd /var/www/hubs-backend && pm2 start ecosystem.config.js --update-env && pm2 save"
 
       - name: ✅ Status Report
         if: success()
