@@ -3,7 +3,7 @@
     "$type": "WeightTier",
     "id": "rule-weight-standard",
     "type": "WeightTier",
-    "name": "Standard Weight Pricing",
+    "name": "ราคาตามน้ำหนักมาตรฐาน",
     "enabled": true,
     "tiers": [
       {
@@ -27,7 +27,7 @@
     "$type": "TimeWindowPromotion",
     "id": "rule-promo-lunch",
     "type": "TimeWindowPromotion",
-    "name": "Lunch Hour Discount",
+    "name": "ส่วนลดช่วงเที่ยง",
     "enabled": true,
     "startTime": "11:00",
     "endTime": "13:00",
@@ -37,7 +37,7 @@
     "$type": "TimeWindowPromotion",
     "id": "rule-promo-morning",
     "type": "TimeWindowPromotion",
-    "name": "Early Bird Discount",
+    "name": "ส่วนลดช่วงเช้าตรู่",
     "enabled": true,
     "startTime": "06:00",
     "endTime": "09:00",
@@ -47,7 +47,7 @@
     "$type": "RemoteAreaSurcharge",
     "id": "rule-surcharge-south",
     "type": "RemoteAreaSurcharge",
-    "name": "Southern Remote Zone (Nakhon Si Thammarat, Phatthalung, Satun)",
+    "name": "พื้นที่ห่างไกลภาคใต้ (นครศรีธรรมราช, พัทลุง, สตูล)",
     "enabled": true,
     "remoteZipPrefixes": ["95", "96", "97"],
     "surchargeFlat": 50
@@ -56,7 +56,7 @@
     "$type": "RemoteAreaSurcharge",
     "id": "rule-surcharge-northeast",
     "type": "RemoteAreaSurcharge",
-    "name": "Northeast Remote Zone (Nakhon Ratchasima, Chaiyaphum, Yasothon)",
+    "name": "พื้นที่ห่างไกลภาคอีสาน (นครราชสีมา, ชัยภูมิ, ยโสธร)",
     "enabled": true,
     "remoteZipPrefixes": ["30", "36", "35"],
     "surchargeFlat": 35

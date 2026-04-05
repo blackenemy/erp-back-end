@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Channels;
 using System.Threading.RateLimiting;
 using Scalar.AspNetCore;
@@ -117,10 +118,18 @@ public partial class Program { }
 // ══════════════════════════════════════════════
 public sealed class RuleServiceClient(HttpClient http)
 {
+    private static readonly JsonSerializerOptions _options = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
     public async Task<List<Rule>> GetRulesAsync()
     {
         var stream = await http.GetStreamAsync("/rules");
-        return await JsonSerializer.DeserializeAsync(stream, AppJsonContext.Default.ListRule) ?? [];
+        return await JsonSerializer.DeserializeAsync<List<Rule>>(stream, _options) ?? [];
     }
 }
 
@@ -241,6 +250,13 @@ public sealed class JobStore
     private readonly ConcurrentDictionary<string, JobRecord> _jobs;
     private readonly ConcurrentDictionary<string, Queue<QuoteRequest>> _pending;
     private readonly Lock _fileLock = new();
+    private static readonly JsonSerializerOptions _options = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
 
     public JobStore()
     {
@@ -249,7 +265,7 @@ public sealed class JobStore
         if (File.Exists(FilePath))
         {
             var json = File.ReadAllText(FilePath);
-            var list = JsonSerializer.Deserialize<List<JobRecord>>(json, AppJsonContext.Default.ListJobRecord) ?? [];
+            var list = JsonSerializer.Deserialize<List<JobRecord>>(json, _options) ?? [];
             _jobs = new(list.ToDictionary(j => j.JobId));
         }
         else
@@ -290,8 +306,8 @@ public sealed class JobStore
     {
         lock (_fileLock)
         {
-            var json = JsonSerializer.Serialize(
-                [.. _jobs.Values], AppJsonContext.Default.ListJobRecord);
+            var list = _jobs.Values.ToList();
+            var json = JsonSerializer.Serialize(list, _options);
             File.WriteAllText(FilePath, json);
         }
     }

@@ -92,5 +92,20 @@ public sealed record JobRecord
     WriteIndented = true,
     PropertyNameCaseInsensitive = true,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
-    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
-public partial class AppJsonContext : JsonSerializerContext;
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    UseStringEnumConverter = false,
+    AllowTrailingCommas = true,
+    ReadCommentHandling = JsonCommentHandling.Skip)]
+public partial class AppJsonContext : JsonSerializerContext
+{
+    public static JsonSerializerOptions Options { get; } = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        AllowTrailingCommas = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        TypeInfoResolver = Default
+    };
+}
